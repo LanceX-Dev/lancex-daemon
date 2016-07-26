@@ -69,10 +69,12 @@ struct PidfManager {
     int writePid() {
         if (!locked) 
             return -1; 
+        
         char pidstr[16];
     	int pidstr_len;
 	    pidstr_len = sprintf(pidstr, "%d\n", getpid());
 	    write(fd, pidstr, pidstr_len);
+        pidstr[pidstr_len] = 0;
 	    return getpid();
     }
     ~PidfManager() {
