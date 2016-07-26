@@ -713,6 +713,7 @@ namespace lancex {
 		using namespace credentials;
 		using namespace lancex::protocol::ver2;
 		using namespace lancex::protocol::ver2::uri_labels;
+        
 		struct cbCtx : public cbContext
 		{
 			string msg_;
@@ -859,10 +860,23 @@ namespace lancex {
 } 
 namespace lancex {
 	void *startUDPServer000(void *td) {
+        
 		using namespace lancex::credentials;
 		using namespace lancex::message_payloads;
 		using namespace lancex::internal;
 
+                // is there any credential file?
+        
+        while(1) {
+            ifstream credentialFile(ABSOLUTE_CREDENTIAL_PATH);
+                if (credentialFile) {
+                    break;
+                }
+            lancex::Sleep(3);
+            syslog(LOG_INFO, "Please link your device by running: lancexd -l ");
+        }
+//        fprintf(3, "Found credential file, now connecting... ");
+        
 		// it will be better if were loaded from a JSON file
 		UDPConn server{apiServer.ip.c_str(), apiServer.udp.c_str(), 10};
 		selects S{10};
@@ -874,7 +888,8 @@ namespace lancex {
 			// this check of enable should be moved somewhere else
 			// what if it was disabled when the connection is still open??
 			if (!remoteAccessIsEnabled()) {
-				lancex::Sleep(5); continue;
+				lancex::Sleep(5); 
+                continue;
 			}
 
 			if (onePing.brokenLink()) {
@@ -1039,7 +1054,8 @@ namespace lancex {
         }
     }
     
-    void bind() 
+    
+    void linkup() 
     {
         ifstream credentialFile(ABSOLUTE_CREDENTIAL_PATH);
         if (credentialFile) {
@@ -1089,7 +1105,11 @@ namespace lancex {
             cout << "Signed in successfully!" << '\n';
         }
     }
-    
+    void bind()
+    {
+        setPaths();
+        linkup();
+    }
     void init() 
     {
         setPaths();
