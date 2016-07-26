@@ -78,34 +78,14 @@ int loadPID()
 }
 int isRunning()
 {
-	/*determine if process is running by check PID*/
-//	if (access(PIDF, F_OK) <0)
-//	{
-//		return -1;
-//	}
-//	
-//    int pid;
-//	FILE *pidFile = fopen (PIDF, "r");
-//
-//	if (pidFile == NULL)
-//	{
-//		fclose(pidFile);
-//		return -1;
-//	}
-//
-//	fscanf(pidFile, "%d", &pid);
-//	fclose(pidFile);
     int pid = loadPID();
-    
     if (pid < 0)
         return -1;
 
 	/* Got PID , now check if this PID is running */
 	struct stat s;
 	char fileString[32];
-
 	sprintf(fileString, "/proc/%d", pid);
-	
 	int err = stat(fileString, &s);
 	if(-1 == err) {
 	    if(ENOENT == errno) {
@@ -119,7 +99,7 @@ void daemon_signal_handler(int sig)
 {
 	if (sig == SIGTERM)
 	{
-//		fprintf(3, "SIGTERM catched and terminating program ");
+        //fprintf(3, "SIGTERM catched and terminating program ");
 		//unlink(PIDF);
 		exit(0);
 	}
@@ -152,10 +132,10 @@ void daemonize()
 	close(STDERR_FILENO);
 }
 void shutdown() {
-            char cmd[256];
-            int pid = loadPID();
-            sprintf(cmd, "kill %d", pid);
-            system(cmd);
+    char cmd[256];
+    int pid = loadPID();
+    sprintf(cmd, "kill %d", pid);
+    system(cmd);
 }
 int main(int argc, char **argv)
 {
