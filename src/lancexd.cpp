@@ -34,6 +34,7 @@
 
 #define PIDF "/tmp/lancexd.pid"
 
+
 int write_pid()
 {
 	int fd = open(PIDF, O_WRONLY|O_CREAT, 0600);
@@ -51,11 +52,34 @@ int write_pid()
 	}
 	char pidstr[16];
 	int pidstr_len;
-	pidstr_len = sprintf(pidstr, "%d\n", getpid());
+	pidstr_len = sprintf(pidstr, "%d", getpid());
+    pidstr[pidstr_len] = 0;
 	write(fd, pidstr, pidstr_len);
     
 	return 0;
 }
+struct PidfManager {
+    int fd;
+    bool locked;
+    PidfManager(const char* file):fd{-1}, locked{false}
+    {
+        fd = open(file, O_WRONLY|O_CREAT, 0600);
+        locked = flock(fd,LOCK_EX|LOCK_NB) >= 0;
+    }
+    int writePid() {
+        if (!locked) 
+            return -1; 
+        char pidstr[16];
+    	int pidstr_len;
+	    pidstr_len = sprintf(pidstr, "%d\n", getpid());
+	    write(fd, pidstr, pidstr_len);
+	    return getpid();
+    }
+    ~PidfManager() {
+        close(fd);
+    }
+};
+
 int loadPID()
 {
  	if (access(PIDF, F_OK) <0)
@@ -139,6 +163,7 @@ void shutdown() {
 }
 int main(int argc, char **argv)
 {
+    struct PidfManager pm{PIDF};
     int c;
     int option_index = 0;
     static struct option long_options[] = {
@@ -159,7 +184,6 @@ int main(int argc, char **argv)
     switch(c) {
         case 0:
         case 'l':
-            // printf("link option \n");
             if (isRunning() == -1) {
                 printf("lancex daemon is not running.\n");
                 printf("To running the deamon type: \n");
@@ -175,12 +199,18 @@ int main(int argc, char **argv)
                 printf("There is already an instance of LanceX. Only one instance please \n");
                 exit(-1);
             }
+            if (!pm.locked) 
+            {
+                printf("Failed to lock /tmp/lancexd.pid \n");
+                exit(-1);
+            }
             printf("Starting LanceX daemon... \n");
             printf("To link this devices, type (with this daemon running in background) : \n");
             printf("lancexd -l \n");
             daemonize();
             lancex::init();
-            if (write_pid() < 0) 
+
+            if (pm.writePid() < 0) 
             {
                 exit(-1);        
             }
@@ -195,6 +225,7 @@ int main(int argc, char **argv)
                 exit(-1);
             }
             shutdown();
+            
             break;
         default:
             printf("unrecognized option\n");
