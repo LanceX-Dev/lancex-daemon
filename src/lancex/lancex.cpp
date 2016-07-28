@@ -798,44 +798,76 @@ namespace lancex {
 		}
 
         using namespace lancex::protocol::ver2::uri_labels;
-		void sign_in_handle(Context C)
-		{
+        
+        string linkToLanceX(const string& parameter) 
+        {
+            JSON response{JSONType::JSON_OBJECT};
+            response["status"] = -1;
             
-//            std::cout << apiServer.ip << ':' << apiServer.tcp << '\n';
-//            return;
-			sslCliConn cli{apiServer.ip.c_str(), apiServer.tcp.c_str(), 5,ctx };
-
-			JSON pl{C.parameter()};
+            JSON pl{parameter};
+            pl["mac"] = hwAddr;
+            sslCliConn cli{apiServer.ip.c_str(), apiServer.tcp.c_str(), 5,ctx };
+			cli.send(req_struct("sign_in/req", pl.stringify()).stringify());
+				// TODO: move timeout value to a seperate file
+			selects s(2);
+			s.rFD_SET(cli.fd(),[&cli, &pl, &response](){
+				JSON rsp{JSON{cli.recvStr()}["arg"].toString()};
+				if (rsp["status"].toInteger() !=0)
+				{
+					return;
+				}
+				JSON task{JSONType::JSON_OBJECT};
+				task["email"] = pl["email"];
+				task["authkey"] = rsp["authKey"];
+				JSON devData{JSONType::JSON_OBJECT};
+				devData["deviceToken"] = rsp["deviceToken"];
+				devData["authorizedUser"] = move(task);
+				devData["connect"] = 1;
+				devData.toFile(ABSOLUTE_CREDENTIAL_PATH);
+				JSON cred{ABSOLUTE_CREDENTIAL_PATH};
+				response["authorized"] = cred["authorizedUser"];
+				response["status"] = 0;
+            });
+				s.listenOnce();
+                return response.stringify();
+        }
+		
+        void sign_in_handle(Context C)
+		{
 			JSON req{C.request()};
 			JSON response{JSONType::JSON_OBJECT};
+//            string& parameter = C.parameter();
 			response["status"] = -1;
 
 			if (req["method"].toString() == "POST") {
-				pl["mac"] = hwAddr;
-				cli.send(req_struct("sign_in/req", pl.stringify()).stringify());
-
-				// TODO: move timeout value to a seperate file
-				selects s(2);
-
-				s.rFD_SET(cli.fd(),[&cli, &pl, &response](){
-					JSON rsp{JSON{cli.recvStr()}["arg"].toString()};
-					if (rsp["status"].toInteger() !=0)
-					{
-						return;
-					}
-					JSON task{JSONType::JSON_OBJECT};
-					task["email"] = pl["email"];
-					task["authkey"] = rsp["authKey"];
-					JSON devData{JSONType::JSON_OBJECT};
-					devData["deviceToken"] = rsp["deviceToken"];
-					devData["authorizedUser"] = move(task);
-					devData["connect"] = 1;
-					devData.toFile(ABSOLUTE_CREDENTIAL_PATH);
-					JSON cred{ABSOLUTE_CREDENTIAL_PATH};
-					response["authorized"] = cred["authorizedUser"];
-					response["status"] = 0;
-				});
-				s.listenOnce();
+                response = linkToLanceX(C.parameter());
+//                JSON pl{parameter};
+//                pl["mac"] = hwAddr;
+//                sslCliConn cli{apiServer.ip.c_str(), apiServer.tcp.c_str(), 5,ctx };
+//				cli.send(req_struct("sign_in/req", pl.stringify()).stringify());
+//
+//				// TODO: move timeout value to a seperate file
+//				selects s(2);
+//
+//				s.rFD_SET(cli.fd(),[&cli, &pl, &response](){
+//					JSON rsp{JSON{cli.recvStr()}["arg"].toString()};
+//					if (rsp["status"].toInteger() !=0)
+//					{
+//						return;
+//					}
+//					JSON task{JSONType::JSON_OBJECT};
+//					task["email"] = pl["email"];
+//					task["authkey"] = rsp["authKey"];
+//					JSON devData{JSONType::JSON_OBJECT};
+//					devData["deviceToken"] = rsp["deviceToken"];
+//					devData["authorizedUser"] = move(task);
+//					devData["connect"] = 1;
+//					devData.toFile(ABSOLUTE_CREDENTIAL_PATH);
+//					JSON cred{ABSOLUTE_CREDENTIAL_PATH};
+//					response["authorized"] = cred["authorizedUser"];
+//					response["status"] = 0;
+//				});
+//				s.listenOnce();
 			} else if (req["method"].toString() == "DELETE") {
 				unlink(ABSOLUTE_CREDENTIAL_PATH);
 				response["status"] = 0;
@@ -1059,8 +1091,20 @@ namespace lancex {
     {
         ifstream credentialFile(ABSOLUTE_CREDENTIAL_PATH);
         if (credentialFile) {
-            return;
+            printf("Found existing credentials in %s \n", ABSOLUTE_USER_FILE_PATH);
+            exit(-1);
         }
+        
+        
+        SSL_library_init();
+        OpenSSL_add_all_algorithms();
+        ERR_load_BIO_strings();
+        SSL_load_error_strings();
+
+        CTXInit();
+        getMACAddr();
+        sslChannelSem = (sem_t *)malloc(sizeof(sem_t));
+        sem_init(sslChannelSem, 0, 1);
         
         
         int status = -1, retries = 0;
@@ -1088,7 +1132,10 @@ namespace lancex {
             query["request"] =  request.stringify();
             query["ver"] = "0001";
             
-            lancex::JSON rsp{localRpcRequest(query.stringify())};
+//            lancex::JSON rsp{localRpcRequest(query.stringify())};
+            string parameter = request["parameter"].stringify();
+            string rtn = lancex::message_payloads::linkToLanceX(parameter);
+            lancex::JSON rsp{rtn};
             
             status = rsp["status"].toInteger();
             retries++;
@@ -1108,6 +1155,7 @@ namespace lancex {
     void bind()
     {
         setPaths();
+        getServerInfo();
         linkup();
     }
     void init() 
