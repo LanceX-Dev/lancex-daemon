@@ -179,8 +179,12 @@ int main(int argc, char **argv)
                     long_options, &option_index);
         
     if (c == -1) {
-        printf("options please \n");
-        exit(-1);
+        printf("LanceX Daemon \n\n");
+        printf("Commands: \n\n");
+        printf("-s, --start       Start the daemon \n");
+        printf("-l, --link        Link this device to LanceX servers \n");
+        printf("-c, --close       Shutdown the daemon if one is running \n\n");
+        exit(0);
     }
     
     switch(c) {
@@ -193,7 +197,7 @@ int main(int argc, char **argv)
             }
             
             lancex::bind();
-            printf("Now start the daemon: \n");
+            printf("*** Now start the daemon ***: \n");
             printf("lancexd --start \n");
             break;
         case 1:           
