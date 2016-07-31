@@ -1008,7 +1008,7 @@ namespace lancex {
         return out;
     }
     
-    void remoteIntfInit() 
+    void initSSLLib()
     {
         SSL_library_init();
         OpenSSL_add_all_algorithms();
@@ -1019,7 +1019,21 @@ namespace lancex {
         getMACAddr();
         sslChannelSem = (sem_t *)malloc(sizeof(sem_t));
         sem_init(sslChannelSem, 0, 1);
+    }
+    
+    void remoteIntfInit() 
+    {
+//        SSL_library_init();
+//        OpenSSL_add_all_algorithms();
+//        ERR_load_BIO_strings();
+//        SSL_load_error_strings();
+//
+//        CTXInit();
+//        getMACAddr();
+//        sslChannelSem = (sem_t *)malloc(sizeof(sem_t));
+//        sem_init(sslChannelSem, 0, 1);
 
+        
         pthread_t thread;
         pthread_create(&thread, NULL, startUDPServer000, (void *)NULL);
         pthread_detach(thread);
@@ -1087,26 +1101,9 @@ namespace lancex {
     }
     
     
-    void linkup() 
-    {
-        ifstream credentialFile(ABSOLUTE_CREDENTIAL_PATH);
-        if (credentialFile) {
-            printf("Found existing credentials in %s \n", ABSOLUTE_USER_FILE_PATH);
-            exit(-1);
-        }
-        
-        
-        SSL_library_init();
-        OpenSSL_add_all_algorithms();
-        ERR_load_BIO_strings();
-        SSL_load_error_strings();
 
-        CTXInit();
-        getMACAddr();
-        sslChannelSem = (sem_t *)malloc(sizeof(sem_t));
-        sem_init(sslChannelSem, 0, 1);
-        
-        
+    int signinPrompt()
+    {
         int status = -1, retries = 0;
         
         do {
@@ -1132,7 +1129,6 @@ namespace lancex {
             query["request"] =  request.stringify();
             query["ver"] = "0001";
             
-//            lancex::JSON rsp{localRpcRequest(query.stringify())};
             string parameter = request["parameter"].stringify();
             string rtn = lancex::message_payloads::linkToLanceX(parameter);
             lancex::JSON rsp{rtn};
@@ -1147,25 +1143,47 @@ namespace lancex {
         
         if (status == -1) {
             cout << "Sign in failed after 3 retries, exiting." << '\n';
-            exit(-1);
+            // exit(-1);
         } else {
             cout << "Signed in successfully!" << '\n';
         }
+        
+        return status;
     }
-    void bind()
+    int linkup(bool block=false) 
+    {
+        ifstream credentialFile(ABSOLUTE_CREDENTIAL_PATH);
+        if (credentialFile) {
+            printf("Found existing credentials. \n");
+            if (block) {
+                printf("Remove the credential then run it again:\n rm -rf %s \n", ABSOLUTE_USER_FILE_PATH);
+                return -1;
+            }
+            return 0;
+        }
+        return signinPrompt();  
+    }
+    
+    void init()
     {
         setPaths();
         getServerInfo();
-        linkup();
+        initSSLLib();
     }
-    void init() 
+    int link()
     {
-        setPaths();
-        getServerInfo();
+        return linkup(false);
+    }
+    int bind()
+    {
+        return linkup(true);
+    }
+    
+    void start() 
+    {
         localIntfInit();
         remoteIntfInit();
         ipc::init();
-//        bindDevice();
     }
 }
 

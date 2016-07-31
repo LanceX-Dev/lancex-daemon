@@ -41,7 +41,9 @@ namespace lancex
     const char QUERY_URL[] = "https://account.lancex.cc/device/info";
         
     void init();
-    void bind();
+    int bind();
+    int link();
+    void start();
     
     std::string localRpcRequest(const std::string& in);
     using namespace std;

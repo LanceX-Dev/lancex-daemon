@@ -195,8 +195,10 @@ int main(int argc, char **argv)
                 printf("lancexd --close \n");
                 exit(0);
             }
+            lancex::init();
+            if (lancex::bind() < 0)
+                exit(-1);
             
-            lancex::bind();
             printf("*** Now start the daemon ***: \n");
             printf("lancexd --start \n");
             break;
@@ -211,12 +213,13 @@ int main(int argc, char **argv)
                 printf("Failed to lock /tmp/lancexd.pid \n");
                 exit(-1);
             }
-            printf("Now start LanceX daemon... \n");
-//            printf("To link this devices, close the daemon and sign in: \n");
-//            printf("lancexd --close \n");
-//            printf("lancexd --link \n");
-            daemonize();
+            
             lancex::init();
+            if (lancex::link() < 0)
+                exit(-1);
+            printf("Starting... \n");
+            daemonize();
+            lancex::start();
 
             if (pm.writePid() < 0) 
             {
